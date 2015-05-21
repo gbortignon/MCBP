@@ -15,7 +15,7 @@ using namespace std;
  *      1 = max
  *      2 = min
  *      3 = alterna 1 e 2
- * [4] Classico/Structured (1/2)
+ * [4] Structered/StructuredPro (2/3)
  * */
 
 int main(int argc, char* argv[])
@@ -60,9 +60,9 @@ int main(int argc, char* argv[])
     int tempClock;
 	ofstream output_file;
 	output_file.open("Times_Greedy.txt", ofstream::out | ofstream::app);
-	
+
     if(algoritmo.compare("greedy") == 0){
-        tempClock = clock();	
+        tempClock = clock();
         sol = solGreedy(istanza, n, bin_capacity_a, bin_capacity_b,compare_function,strategia, DEBUG);
         output_file << ((float)clock()-tempClock)/CLOCKS_PER_SEC << ";\n";
 	}
