@@ -16,6 +16,67 @@ int * getStructuredSolution(int[][3], int, int, int,int, int*, bool);
 //Si calcola il numero minimo di bin utilizzabili considerando gli elementi come continui dividendo per il loro numero ricalcolando tale valore ogni volta che si inserisce un elemento
 int * getStructuredProSolution(int[][3], int, int, int,int, int*, bool);
 
+/***** Strategie per la soluzione classica *****/
+int getMaxFill(int[][3], int, int, int, int*,bool);
+
+/***** Strategie per la soluzione strutturata *****/
+int * getStructuredMaxFill(int[][3], int, int[][2], int, int, int, int*, bool, int*);
+int * getStructuredMaxFillMean(int[][3], int, int[][2], int, int, int, int*, bool, int*);
+// Pesa la somma delle due dimensioni secondo quella più grande, in modo da valorizzare oggetti con una dimensione molto grande
+int * getStructuredWeightedMean(int[][3], int, int[][2], int, int, int, int*, bool, int*);
+//Si cerca l'oggetto con la maggiore differenza delle dimensioni
+int * getStructuredMaxFillSub(int[][3], int, int[][2], int, int, int, int*, bool, int*);
+
+void checkSolutionValues(int[][3], int*, int, int, int);
+
+//Interfaccia esterna per determinare se utilizzare soluzione classica o strutturata
+int* solGreedy(int istanza[][3], int n, int bin_capacity_a, int bin_capacity_b, int compare_function,int structured, bool DEBUG)
+{
+    int * bin_assignment = new int[n];
+    switch(structured)
+    {
+    //Structured
+    case(2):
+        bin_assignment = getStructuredSolution(istanza,n,bin_capacity_a,bin_capacity_b,compare_function, bin_assignment, DEBUG);
+        break;
+    //StructuredPro
+    case(3):
+        bin_assignment = getStructuredProSolution(istanza,n,bin_capacity_a,bin_capacity_b,compare_function, bin_assignment, DEBUG);
+        break;
+    }
+    checkSolutionValues(istanza,bin_assignment,n,bin_capacity_a,bin_capacity_b);
+    return bin_assignment;
+}
+
+// Controllo eventuali difetti per ammissibilità, coerenza assegnamento e relativi valori di spazio vuoto
+void checkSolutionValues(int istanza[][3], int* soluzione, int n, int bin_capacity_a, int bin_capacity_b){
+	int sum_a;
+	int sum_b;
+	int max = INT_MIN;
+	for(int j=0; j<n; j++){
+		if(soluzione[j]>max){
+			max=soluzione[j];
+		}
+	}
+	for(int bin=0; bin<max; bin++)
+	{
+		sum_a = 0;
+		sum_b = 0;
+		for(int i=0; i<n; i++)
+		{
+			if(soluzione[i]==bin)
+			{
+				sum_a += istanza[i][1];
+				sum_b += istanza[i][2];
+			}
+		}
+		if(sum_a > bin_capacity_a || sum_b > bin_capacity_b){
+			cout << "CAPACITA' SFORATA!!" << endl;
+			exit(1);
+		}
+	}
+}
+
 
 //Si calcola il numero minimo di bin utilizzabili considerando gli elementi come continui dividendo per
 //il loro numero
@@ -223,7 +284,7 @@ int * getStructuredProSolution(int istanza[][3], int n, int bin_capacity_a, int 
       for(int j=0;j<n;j++)
       {
         //Calcolo la somma della dimensione degli oggetti non ancora inseriti
-        if(bin_assignment[j] == -1){
+        if(bin_assigment[j] == -1){
           temp_sum_a += istanza[j][1];
           temp_sum_b += istanza[j][2];
         }
@@ -515,4 +576,57 @@ int * getStructuredMaxFillSub(int istanza[][3],int n, int bin_capacities[][2], i
     if(DEBUG)
         cout << "MAXFILLMEAN: " << index_max+1 << "\n";
     return index;
+}
+
+
+//Si cerca l'elemento più grosso che stia nel bin corrente, secondo la dimensione dominante dell'oggetto
+int getMaxFill(int istanza[][3],int n, int capacity_a, int capacity_b, int* bin_assignment, bool DEBUG)
+{
+    double max = 0;
+    int index_max = -1;
+    if(DEBUG)
+        cout << "CAPACITY_A: " << capacity_a << " CAPACITY_B: " << capacity_b << "\n";
+    for(int i=0;i<n;i++)
+    {
+        if(bin_assignment[i] == -1) //Se l'oggetto non è ancora stato assegnato
+        {
+            if(istanza[i][1] <= capacity_a && istanza[i][2] <= capacity_b) //Se l'oggetto sta nella capacità corrente
+            {
+                //Non ho ancora trovato il maxFill
+                if(index_max == -1)
+                {
+                    //Se la dimensione 1 è relativamente più "grossa" della 2 assegno il max al valore della 1
+                    if((double)istanza[i][1]/capacity_a > (double)istanza[i][2]/capacity_b)
+                        max = (double)istanza[i][1]/capacity_a;
+                    else
+                        max = (double)istanza[i][2]/capacity_b;
+                    //Aggiorno l'indice dell'oggetto maxFill
+                    index_max = i;
+                }
+                //Ho già trovato un massimo
+                else
+                {
+                    if((double)istanza[i][1]/capacity_a > (double)istanza[i][2]/capacity_b)
+                    {
+                        if((double)istanza[i][1]/capacity_a > max)
+                        {
+                            max = (double)istanza[i][1]/capacity_a;
+                            index_max = i;
+                        }
+                    }
+                    else
+                    {
+                        if((double)istanza[i][2]/capacity_b > max)
+                        {
+                            max = (double)istanza[i][2]/capacity_b;
+                            index_max = i;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if(DEBUG)
+        cout << "MAXFILL: " << index_max+1 << "\n";
+    return index_max;
 }
