@@ -52,12 +52,25 @@ static int strategia_scambio;
 static int spostamenti;
 static int scambi;
 
+/** TABOO SEARCH ***/
+//Tiene la corrispondenza della mossa alla quale l'oggetto i è stato associato al bin j
+static int taboo_matrix[1000][1000];
+//Tiene l'iterazione alla quale l'oggetto è stato spostato l'ultima volta
+static int taboo_vector[1000];
+static const int vect_size = 7;
+static const int matrix_size = 15;
+static const int max_iterations = 50;
+static int curr_iteration;
+
 void solMulti(int istanza[][3], int num_obj, int capacita_a, int capacita_b,
 	string strategia_s, string restarts,  string greedy_compare_function,
 	string greedy_structured, bool DEBUG)
 {
 	int i,j,k,r;
 	n=num_obj;
+	
+	static const int num_oggetti = 5;	
+	
 	bin_capacity_a = capacita_a;
 	bin_capacity_b = capacita_b;
 
@@ -73,7 +86,6 @@ void solMulti(int istanza[][3], int num_obj, int capacita_a, int capacita_b,
 	strategia_scambio = atoi(strategia_s.c_str());
 	// Numero di restart
 	restart = atoi(restarts.c_str());
-
 	// Restart
 	for(r=0; r<restart; r++)
 	{
@@ -87,7 +99,7 @@ void solMulti(int istanza[][3], int num_obj, int capacita_a, int capacita_b,
 				max = curr_sol[i];
 		}
 		max_bins = max+1;
-
+	
 		// inizializzo a vuoti i bin
 		sp_lib_a = new int[max_bins];
 		sp_lib_b = new int[max_bins];
@@ -112,14 +124,19 @@ void solMulti(int istanza[][3], int num_obj, int capacita_a, int capacita_b,
 		closedBins = new int[max_bins];
 		//chiudo i bin che non ho usato
 		checkClosedBins();
+		
+		// Inizializzazione delle liste taboo
+		for(int obj=0;obj<n;obj++){
+			taboo_vector[obj] = vect_size*(-1);
+			for(int bin=0;bin<bins_aperti;bin++)
+				taboo_matrix[bin][obj] = matrix_size*(-1);	
+		}
+		
 
-		mosso = true;
-		while(mosso)
+		for(curr_iteration=0;curr_iteration<max_iterations;curr_iteration++)
 		{
-			mosso=false;
-			mosso = sposto(istanza);
-			if(mosso) continue;
-			mosso = scambio(istanza);
+			if(!sposto(istanza))
+				scambio(istanza);
 		}
 
 		// Aggiorno il conto dei bin aperti e chiusi
@@ -134,17 +151,24 @@ void solMulti(int istanza[][3], int num_obj, int capacita_a, int capacita_b,
 		{
 			mosso=false;
 			mosso=esci_ammissibilita_piu_vuoto(istanza);
-			bool mosso_interno=true;
-			// Provo a spostare/scambiare per migliorare la soluzione ma SOLO nell'ammissibilità
-			while(mosso_interno){
-				mosso_interno = false;
-				mosso_interno = sposto(istanza);
-				if(mosso_interno){
-					mosso = true;
-					continue;
+			if(mosso){
+				// Provo a spostare/scambiare per migliorare la soluzione ma SOLO nell'ammissibilità
+				// Inizializzazione delle liste taboo
+				for(int obj=0;obj<n;obj++){
+					taboo_vector[obj] = vect_size*(-1);
+					for(int bin=0;bin<bins_aperti;bin++)
+						taboo_matrix[bin][obj] = matrix_size*(-1);	
 				}
-				mosso_interno = scambio(istanza);
-				if(mosso_interno) mosso = true;
+				
+
+				for(curr_iteration=0;curr_iteration<20;curr_iteration++)
+				{
+					bool mosso_intern;
+					mosso_intern = sposto(istanza);
+					if(!mosso_intern)
+						mosso_intern = scambio(istanza);
+					if(mosso_intern) mosso = true;
+				}
 			}
 			mosso = checkSolutionValues(istanza) && mosso;
 		}
@@ -190,7 +214,9 @@ bool sposto(int istanza[][3]){
 	for(int i=0; i<n; i++)
 	{
 		// se questo è nel bin più vuoto
-		if(curr_sol[i] == bin_piu_vuoto)
+		if(curr_sol[i] == bin_piu_vuoto && 
+		   // se non è in lista taboo per essere mosso
+		   curr_iteration - taboo_vector[i] > vect_size)
 		{
 			// lo metto in un altro bin rispettando il max fill mean
 			altro_bin = get_best_bin_maxFillMean(istanza, i);
@@ -198,7 +224,10 @@ bool sposto(int istanza[][3]){
 			if(altro_bin < 0) return false;
 
 			spostamenti++;
-
+			
+			taboo_matrix[curr_sol[i]][i] = curr_iteration;
+			taboo_vector[i] = curr_iteration;
+			
 			// occupo lo spazio nel nuovo bin
 			sp_lib_a[altro_bin] = sp_lib_a[altro_bin]-istanza[i][1];
 			sp_lib_b[altro_bin] = sp_lib_b[altro_bin]-istanza[i][2];
@@ -226,7 +255,7 @@ bool sposto(int istanza[][3]){
 				cout<<"spazio bin j A: "<<sp_lib_a[altro_bin]<<endl;
 				cout<<"spazio bin j B: "<<sp_lib_b[altro_bin]<<endl;
 				exit(1);
-			}			
+			}		
 			return true;
 		}
 	}
@@ -242,13 +271,21 @@ bool scambio(int istanza[][3]){
 	for(int i=0; i<n; i++)
 	{
 		// se questo è nel bin più vuoto
-		if(curr_sol[i] == bin_piu_vuoto)
+		if(curr_sol[i] == bin_piu_vuoto && 
+		   // se non è in lista taboo per essere mosso
+		   curr_iteration - taboo_vector[i] > vect_size)
 		{
 			// confrontalo con ogni altro oggetto...
 			for(int j=0; j<n; j++)
 			{
 				// ...che non è nello stesso bin
-				if(curr_sol[j] != bin_piu_vuoto)
+				if(curr_sol[j] != bin_piu_vuoto && 
+				   // se non è in lista taboo per essere mosso
+				   curr_iteration - taboo_vector[j] > vect_size && 
+				   // se posso spostare i nel bin in cui adesso c'è j
+				   curr_iteration - taboo_matrix[curr_sol[j]][i] > matrix_size &&
+				   // se posso spostare j nel bin in cui adesso c'è i
+				   curr_iteration - taboo_matrix[curr_sol[i]][j] > matrix_size)
 				{
 					// se uno scambio tra i due oggetti segue la strategia di scambio indicata
 					if(applica_strategia_scambio(istanza, i, j))
@@ -305,7 +342,12 @@ bool scambio(int istanza[][3]){
 							cout<<"spazio j B: "<<sp_lib_b[curr_sol[j]]<<endl;
 							exit(1);
 						}
-
+						
+						taboo_matrix[curr_sol[i]][i] = curr_iteration;
+						taboo_vector[i] = curr_iteration;
+						taboo_matrix[curr_sol[j]][j] = curr_iteration;
+						taboo_vector[j] = curr_iteration;
+						
 						//effettuo lo scambio
 						curr_sol[i] = curr_sol[j];
 						curr_sol[j] = bin_piu_vuoto;						
@@ -492,6 +534,8 @@ int get_best_bin_maxFillMean(int istanza[][3], int i){
 	{
 		// Se l'oggetto ci sta...
 		if(istanza[i][1]<=sp_lib_a[bin] && istanza[i][2]<=sp_lib_b[bin] &&
+		// ...non è in lista taboo la coppia bin/oggetto
+		curr_iteration - taboo_matrix[bin][i] > matrix_size &&
 		// ...rispetta il best fill mean...
 			(double)istanza[i][1]/sp_lib_a[bin] + (double)istanza[i][2]/sp_lib_b[bin] > mean &&
 		// ... il bin in cui lo voglio mettere è aperto...
